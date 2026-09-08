@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<!-- No network sources are listed, so the page cannot reach out even if the
+     markup is edited later. `file:` is needed because the window is opened
+     with loadFile(): a file:// document has a null origin, so 'self' alone
+     would block the GIF sitting right next to this file. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src 'self' file: data:; style-src 'unsafe-inline'">
+<title>Обновление недоступно</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #f3f6f8;
+    --fg: #131a22;
+    --muted: #5f6d7c;
+    --rule: #d6dde5;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0f1419;
+      --fg: #e4ebf2;
+      --muted: #94a2b1;
+      --rule: #27313c;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 28px 32px 32px;
+    background: var(--bg);
+    color: var(--fg);
+    font: 14px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    align-items: center;
+    text-align: center;
+  }
+  h1 {
+    margin: 0;
+    font-size: 1.35rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+  p {
+    margin: 0;
+    max-width: 52ch;
+    color: var(--muted);
+  }
+  code {
+    font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+    font-size: 0.9em;
+    color: var(--fg);
+  }
+  img {
+    max-width: 100%;
+    border-radius: 6px;
+    border: 1px solid var(--rule);
+    display: block;
+  }
+</style>
+</head>
+<body>
+  <h1>Обновление недоступно</h1>
+  <p>
+    Эта сборка установлена из офлайн-комплекта и обновляется пересборкой
+    архива на сборочной машине — см. <code>README-bundle.md</code>.
+  </p>
+  <img src="update-disabled.gif" alt="">
+</body>
+</html>

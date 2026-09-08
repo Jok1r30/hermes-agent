@@ -393,6 +393,20 @@ def check_for_updates() -> Optional[int]:
     if behind but the count is unknown, ``0`` if up-to-date, or ``None`` if
     the check failed or doesn't apply. Cached for 6 hours.
     """
+    # Fork: the passive check is off. It was the last outbound request the
+    # agent made on its own — a `git fetch origin main`, plus the GitHub
+    # compare API when behind — and this fork exists to keep the agent off the
+    # network. It also had nothing left to offer: the bundle ships without
+    # `.git`, so the check cannot run on the target machine anyway, and where
+    # it can run it advertises `hermes update`, which now refuses (see
+    # cmd_update_disabled in hermes_cli/main.py).
+    #
+    # `None` is the established "doesn't apply" answer — the docker/apt branch
+    # below returns it for the same reason — and all three callers already
+    # handle it: the Rich banner, the Ink badge (guarded on `> 0`), and the
+    # dashboard's /api/hermes/update/check endpoint.
+    return None
+
     hermes_home = get_hermes_home()
     cache_file = hermes_home / ".update_check"
     embedded_rev = os.environ.get("HERMES_REVISION") or None
