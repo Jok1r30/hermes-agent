@@ -10058,12 +10058,44 @@ def _size_delta_label(saved_mb: float) -> str:
     return f"grew by {-saved_mb:.1f} MB"
 
 
+# Shown instead of running an update. Kept in sync by hand with the copy in
+# apps/desktop/electron/main.ts — the desktop process is Node and cannot read
+# this module.
+UPDATE_DISABLED_MESSAGE = (
+    "Обновление недоступно.\n"
+    "\n"
+    "Эта сборка установлена из офлайн-комплекта и обновляется пересборкой\n"
+    "архива на сборочной машине — см. README-bundle.md."
+)
+
+
+def cmd_update_disabled(args):
+    """Refuse to update — this fork ships without an update path.
+
+    The fork exists to keep the agent off the network: the bundle is built
+    elsewhere and carried over as one archive, deliberately without ``.git``.
+    Upstream's update is a ``git pull`` in a checkout, so it cannot work here
+    even in principle, and a half-finished attempt can leave the source tree
+    inconsistent (upstream #49145 — tracked ``ui-tui/`` files left deleted).
+
+    Wired in place of ``cmd_update`` where the parser is built, rather than
+    guarding ``cmd_update`` itself: upstream's function stays byte-identical,
+    so the tests that drive it keep passing and the fork's footprint in this
+    file is a single argument. Nothing reaches the real update path, since
+    ``set_defaults(func=...)`` is its only dispatch.
+    """
+    print(UPDATE_DISABLED_MESSAGE, file=sys.stderr)
+    sys.exit(1)
+
+
 def cmd_update(args):
     """Update Hermes Agent to the latest version.
 
     Thin wrapper around ``_cmd_update_impl``: installs hangup protection,
     runs the update, then restores stdio on the way out (even on
     ``sys.exit`` or unhandled exceptions).
+
+    Not reachable from the CLI in this fork — see ``cmd_update_disabled``.
     """
     from hermes_cli.config import (
         detect_install_method,
@@ -13773,7 +13805,7 @@ def main():
     # =========================================================================
     # update command  (parser built in hermes_cli/subcommands/update.py)
     # =========================================================================
-    build_update_parser(subparsers, cmd_update=cmd_update)
+    build_update_parser(subparsers, cmd_update=cmd_update_disabled)
 
     # =========================================================================
     # uninstall command  (parser built in hermes_cli/subcommands/uninstall.py)

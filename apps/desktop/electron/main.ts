@@ -12846,11 +12846,11 @@ ipcMain.handle('hermes:connections:update-all', async (_event, payload) => {
 
         try {
           if (connection.kind === 'local') {
-            // The app-managed runtime updates through the same pipeline as the
-            // Settings → Updates button (marker + venv gate + relaunch flow).
-            const result: any = await applyUpdates({})
-
-            return { ...base, ok: result?.ok !== false, detail: result?.message || 'update started' }
+            // Fork: the local connection is this machine's own install, and
+            // updating it is disabled for the same reason as Settings →
+            // Updates. This is the second route into applyUpdates, so it has
+            // to be closed too or "update all" would still start a pull.
+            return { ...base, ok: false, skipped: true, reason: 'fork-update-disabled', detail: UPDATE_DISABLED_MESSAGE }
           }
 
           const descriptor: any = await ensureRegistryBackend(connection.id, null)
@@ -14337,23 +14337,69 @@ const terminalIpc = registerTerminalIpc({
 
 const disposeTerminalSession = terminalIpc.disposeTerminalSession
 
-ipcMain.handle('hermes:updates:check', async () =>
-  checkUpdates().catch(error => ({
-    supported: true,
-    branch: readDesktopUpdateConfig().branch,
-    error: 'check-failed',
-    message: error?.message || String(error),
-    fetchedAt: Date.now()
-  }))
-)
+// Fork: updates are disabled by design — the agent is kept off the network and
+// the bundle is rebuilt elsewhere, so there is nothing here to pull into. Kept
+// in sync by hand with UPDATE_DISABLED_MESSAGE in hermes_cli/main.py; this
+// process is Node and cannot read that module.
+const UPDATE_DISABLED_MESSAGE =
+  'Обновление недоступно. Эта сборка установлена из офлайн-комплекта ' +
+  'и обновляется пересборкой архива на сборочной машине — см. README-bundle.md.'
 
-ipcMain.handle('hermes:updates:apply', async (_event, payload) =>
-  applyUpdates(payload || {}).catch(error => ({
-    ok: false,
-    error: 'apply-failed',
-    message: error?.message || String(error)
-  }))
-)
+let updateDisabledWindow: BrowserWindow | null = null
+
+/** Show the stub window explaining why updates are off. Focuses the existing
+ *  one instead of stacking copies when clicked twice. */
+function showUpdateDisabledWindow() {
+  if (updateDisabledWindow && !updateDisabledWindow.isDestroyed()) {
+    updateDisabledWindow.focus()
+
+    return
+  }
+
+  const win = new BrowserWindow({
+    width: 660,
+    height: 640,
+    resizable: false,
+    minimizable: false,
+    maximizable: false,
+    title: 'Обновление недоступно',
+    icon: getAppIconPath(),
+    // Explicit background: this window must never inherit the translucent
+    // chat surface, whose Mica backing is unreliable on locked-down hosts
+    // and would leave the text sitting on whatever is behind the app.
+    backgroundColor: '#f3f6f8',
+    show: false,
+    webPreferences: { nodeIntegration: false, contextIsolation: true, sandbox: true }
+  })
+
+  // Local file only. The GIF sits next to this HTML inside assets/ (already
+  // covered by the packager's "assets/**"), so the window renders identically
+  // on a machine with no route to the internet.
+  void win.loadFile(path.join(APP_ROOT, 'assets', 'update-disabled.html'))
+  win.once('ready-to-show', () => win.show())
+  win.on('closed', () => {
+    updateDisabledWindow = null
+  })
+
+  updateDisabledWindow = win
+}
+
+// `supported: false` is an existing contract the renderer already handles
+// (updates-overlay.tsx and about-settings.tsx render `message` under a
+// "not available" heading), so no update button is offered in the first place.
+ipcMain.handle('hermes:updates:check', async () => ({
+  supported: false,
+  reason: 'fork-update-disabled',
+  message: UPDATE_DISABLED_MESSAGE,
+  hermesRoot: resolveUpdateRoot(),
+  branch: readDesktopUpdateConfig().branch
+}))
+
+ipcMain.handle('hermes:updates:apply', async () => {
+  showUpdateDisabledWindow()
+
+  return { ok: false, error: 'fork-update-disabled', message: UPDATE_DISABLED_MESSAGE }
+})
 
 ipcMain.handle('hermes:updates:branch:get', async () => readDesktopUpdateConfig())
 
