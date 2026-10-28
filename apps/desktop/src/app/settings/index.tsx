@@ -162,10 +162,10 @@ export function SettingsView({ onClose, onConfigSaved, onMainModelChanged }: Set
     }
   }, [activeView, setActiveView])
 
-  // Providers subnav (Accounts vs API keys) lives in its own param so each
-  // sub-view is deep-linkable and survives a refresh.
-  // A saved link to a view this fork removed (`?pview=keys`) no longer
-  // matches the enum and falls back to custom endpoints.
+  // Providers subnav lives in its own param so each sub-view is deep-linkable
+  // and survives a refresh. A saved link to a view this fork removed
+  // (`?pview=keys`) no longer matches the enum and falls back to custom
+  // endpoints.
   const [providerView, setProviderView] = useRouteEnumParam<ProviderView>(
     'pview',
     ENABLED_PROVIDER_VIEWS,
