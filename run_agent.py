@@ -1977,6 +1977,81 @@ class AIAgent:
                 if timestamp is not None:
                     msg["timestamp"] = timestamp
 
+    def _stamp_turn_duration(self, messages: List[Dict]) -> None:
+        """Record how long this turn ran on its final assistant message.
+
+        The desktop measures the same span itself while it watches a turn
+        stream, but that number is renderer-only: nothing sends it back, so
+        reopening a session loses it on every reply. Stamping it here puts it
+        in ``display_metadata``, which the persist layer already carries to the
+        durable row (see ``gateway/session.py``), so the time survives a
+        restart and shows on history the transcript never watched live.
+
+        Placed in the persist funnel rather than at the dozen-odd sites that
+        append an assistant message: this runs once per turn-end, after the
+        reply has settled, and needs no knowledge of which path produced it.
+
+        This funnel runs many times per turn, not once — the tool loop
+        persists on every redirect and iteration — so the target is picked by
+        the state of the tail rather than by a turn-lifecycle flag. An earlier
+        version keyed off ``_inflight_turn_id``; ``note_turn_persisted`` clears
+        that at the end of the FIRST persist of the turn, which silenced every
+        later call, and the one message in range at that point was the previous
+        turn's reply, already durable. Nothing ever reached the database.
+
+        The tail is walked backwards and the stamp lands only on a reply that
+        is settled and still unwritten:
+
+        * the first non-assistant row ends the search — a tool result or the
+          next user row means any reply below it belongs to a finished
+          exchange;
+        * ``tool_calls`` means the turn is still working, so the span is not
+          final yet;
+        * ``_DB_PERSISTED_MARKER`` means the row is already durable and the
+          flush below would skip it, so stamping it would be a silent no-op.
+        """
+        started = getattr(self, "_inflight_turn_started", 0.0)
+
+        if not started:
+            return
+
+        # Index of this turn's user row. Keeps the walk from reaching back into
+        # an earlier exchange when that one's reply somehow never flushed.
+        turn_start_idx = getattr(self, "_persist_user_message_idx", None)
+
+        if not isinstance(turn_start_idx, int):
+            turn_start_idx = -1
+
+        elapsed = time.time() - started
+
+        # Sub-second turns are noise, and a clock jump backwards must never
+        # write a negative span.
+        if elapsed < 1:
+            return
+
+        for idx in range(len(messages) - 1, turn_start_idx, -1):
+            msg = messages[idx]
+
+            if msg.get("role") != "assistant":
+                return
+
+            if msg.get("tool_calls") or msg.get(_DB_PERSISTED_MARKER):
+                return
+
+            metadata = msg.get("display_metadata")
+
+            # Only ever a plain dict on the live list; a str means an already
+            # encoded row wandered in, and rewriting it would double-encode.
+            if metadata is None:
+                metadata = {}
+                msg["display_metadata"] = metadata
+            elif not isinstance(metadata, dict):
+                return
+
+            metadata.setdefault("duration_s", round(elapsed, 1))
+
+            return
+
     def _persist_session(self, messages: List[Dict], conversation_history: List[Dict] = None):
         """Save session state to both JSON log and SQLite on any exit path.
 
@@ -2000,6 +2075,7 @@ class AIAgent:
 
         def _persist_and_drain() -> None:
             self._drop_trailing_empty_response_scaffolding(messages)
+            self._stamp_turn_duration(messages)
             self._session_messages = messages
             self._save_session_log(messages)
             self._flush_messages_to_session_db(messages, conversation_history)

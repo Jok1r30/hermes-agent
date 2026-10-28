@@ -79,6 +79,15 @@ function timelineTaskCount(metadata: SessionMessage['display_metadata']): number
   return typeof count === 'number' ? count : undefined
 }
 
+function turnDurationSeconds(metadata: SessionMessage['display_metadata']): number | undefined {
+  const seconds = parseDisplayMetadata(metadata)?.duration_s
+
+  // Stamped by the agent at turn-end persist (run_agent.py). Absent on every
+  // reply written before that existed, and on rows from an older backend —
+  // undefined then, so the badge simply does not render rather than showing 0.
+  return typeof seconds === 'number' && Number.isFinite(seconds) && seconds > 0 ? seconds : undefined
+}
+
 function messageReactions(metadata: SessionMessage['display_metadata']): MessageReaction[] {
   const reactions = parseDisplayMetadata(metadata)?.reactions
 
@@ -291,6 +300,7 @@ export function toChatMessages(messages: SessionMessage[]): ChatMessage[] {
     }
 
     const reactions = messageReactions(message.display_metadata)
+    const durationS = message.role === 'assistant' ? turnDurationSeconds(message.display_metadata) : undefined
     // Gateway resume names the durable row id `row_id`; the REST transcript
     // prefetch ships the same messages.id as a numeric `id`. Either one lets
     // reactions address this exact row later.
@@ -302,6 +312,7 @@ export function toChatMessages(messages: SessionMessage[]): ChatMessage[] {
       parts,
       timestamp: earliestTimestamp(message.timestamp, ...parts.map(part => part.timestamp)),
       ...(rowId !== undefined ? { rowId } : {}),
+      ...(durationS !== undefined ? { durationS } : {}),
       ...(reactions.length ? { reactions } : {}),
       ...(extractedAttachmentRefs ? { attachmentRefs: extractedAttachmentRefs } : {})
     })

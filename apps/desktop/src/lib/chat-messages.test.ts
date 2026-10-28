@@ -395,6 +395,41 @@ describe('toChatMessages', () => {
   })
 })
 
+describe('turn duration from display_metadata', () => {
+  it.each([
+    ['an object', { duration_s: 38.4 }, 38.4],
+    ['JSON text', JSON.stringify({ duration_s: 12 }), 12],
+    ['no duration', { task_count: 2 }, undefined],
+    ['a zero duration', { duration_s: 0 }, undefined],
+    ['a non-numeric duration', { duration_s: 'fast' }, undefined],
+    ['unparseable text', '{not-json', undefined]
+  ])('reads the persisted duration given %s', (_case, displayMetadata, expected) => {
+    const [message] = toChatMessages([
+      {
+        role: 'assistant',
+        content: 'Done.',
+        display_metadata: displayMetadata as SessionMessage['display_metadata'],
+        timestamp: 1
+      }
+    ])
+
+    expect(message.durationS).toBe(expected)
+  })
+
+  it('ignores a duration stamped on a user row', () => {
+    const [message] = toChatMessages([
+      {
+        role: 'user',
+        content: 'Hi.',
+        display_metadata: { duration_s: 38 } as SessionMessage['display_metadata'],
+        timestamp: 1
+      }
+    ])
+
+    expect(message.durationS).toBeUndefined()
+  })
+})
+
 describe('renderMediaTags', () => {
   it('renders standalone and inline MEDIA tags as links', () => {
     expect(renderMediaTags('here\nMEDIA:/tmp/voice.mp3\nthere')).toBe(
@@ -476,6 +511,49 @@ describe('preserveLocalAssistantErrors', () => {
 
     expect([message.timestamp, message.completedAt]).toEqual([1, 3])
     expect(message.parts[0]).toMatchObject({ completedAt: 3, timestamp: 1, type: 'text' })
+  })
+
+  it('carries the live turn duration onto the rehydrated row', () => {
+    // The backend never sends duration back, so every rehydrated copy arrives
+    // without it. Dropping it here made the "38s" badge flash and disappear.
+    const durable = toChatMessages([{ role: 'assistant', content: 'Done.', timestamp: 3 }])
+
+    const live: ChatMessage[] = [
+      {
+        completedAt: 3,
+        durationS: 38,
+        id: 'assistant-stream',
+        parts: [{ completedAt: 3, text: 'Done.', timestamp: 1, type: 'text' }],
+        role: 'assistant',
+        timestamp: 1
+      }
+    ]
+
+    const [message] = preserveLocalAssistantErrors(durable, live)
+
+    expect(message.durationS).toBe(38)
+  })
+
+  it('lets a persisted duration win over the locally measured one', () => {
+    const durable = toChatMessages([{ role: 'assistant', content: 'Done.', timestamp: 3 }]).map(message => ({
+      ...message,
+      durationS: 12
+    }))
+
+    const live: ChatMessage[] = [
+      {
+        completedAt: 3,
+        durationS: 38,
+        id: 'assistant-stream',
+        parts: [{ completedAt: 3, text: 'Done.', timestamp: 1, type: 'text' }],
+        role: 'assistant',
+        timestamp: 1
+      }
+    ]
+
+    const [message] = preserveLocalAssistantErrors(durable, live)
+
+    expect(message.durationS).toBe(12)
   })
 
   it('preserves a local user+error pair when hydration omits the failed turn', () => {

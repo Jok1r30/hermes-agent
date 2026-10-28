@@ -555,6 +555,10 @@ export type TimelineDisplayMetadata =
       duration_seconds?: number
     }
   | { reactions: MessageReaction[] }
+  /** Wall-clock seconds the turn took, stamped on the final assistant message
+   *  at turn-end persist (run_agent.py). Absent on replies written before that
+   *  existed and on rows from an older backend. */
+  | { duration_s: number }
 
 /** One emoji reaction on a message. One per author, iOS-Tapback style. */
 export interface MessageReaction {

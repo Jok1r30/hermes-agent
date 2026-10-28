@@ -109,9 +109,19 @@ function reconcileLocalAssistantTimeline(nextMessages: ChatMessage[], currentMes
       } as ChatMessagePart
     })
 
+    // Turn duration is measured live (message.start to message.complete) and
+    // the backend does not send it back, so a rehydrated copy always arrives
+    // without it. Without this carry-over the duration badge appeared for a
+    // moment and vanished at the next sync, which read as the feature simply
+    // not existing. The hydrated value still wins when there is one, so a
+    // backend that starts persisting duration takes precedence over our own
+    // local measurement.
+    const durationS = message.durationS ?? local.durationS
+
     return {
       ...message,
       completedAt: latestBoundary(message.completedAt, local.completedAt, ...parts.map(part => part.completedAt)),
+      ...(durationS !== undefined ? { durationS } : {}),
       parts,
       timestamp: earliestBoundary(message.timestamp, local.timestamp, ...parts.map(part => part.timestamp))
     }

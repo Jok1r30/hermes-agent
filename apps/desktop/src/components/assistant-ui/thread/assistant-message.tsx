@@ -392,7 +392,10 @@ const AssistantFooter: FC<MessageActionProps & { durationS?: number }> = ({ dura
     <div className="flex min-h-6 flex-col items-end gap-1 pr-(--message-text-indent) pl-(--message-text-indent)">
       {durationS !== undefined && (
         <span
-          className="select-none px-0.5 text-[0.6875rem] leading-5 tabular-nums text-muted-foreground"
+          // Nudged up from 0.6875rem/muted: at that size against a muted
+          // colour the number read as chrome and went unnoticed. Same slot and
+          // alignment, just legible.
+          className="select-none px-0.5 text-xs leading-5 tabular-nums text-foreground/70"
           data-slot="aui_turn-duration"
           title={t.assistant.thread.turnDuration(formatElapsed(durationS))}
         >
