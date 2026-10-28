@@ -2,7 +2,6 @@ import { useStore } from '@nanostores/react'
 import { useCallback, useEffect, useMemo, useRef } from 'react'
 import { useLocation, useNavigate } from 'react-router'
 
-import { codiconIcon } from '@/components/ui/codicon'
 import { KbdCombo } from '@/components/ui/kbd'
 import { Tip } from '@/components/ui/tooltip'
 import { getHermesConfigDefaults, getHermesConfigRecord, saveHermesConfig } from '@/hermes'
@@ -49,7 +48,7 @@ import { KeybindSettings } from './keybind-settings'
 import { KEYS_VIEWS, KeysSettings, type KeysView } from './keys-settings'
 import { NotificationsSettings } from './notifications-settings'
 import { PluginsSettings } from './plugins-settings'
-import { PROVIDER_VIEWS, ProvidersSettings, type ProviderView } from './providers-settings'
+import { ENABLED_PROVIDER_VIEWS, ProvidersSettings, type ProviderView } from './providers-settings'
 import { SessionsSettings } from './sessions-settings'
 import type { SettingsPageProps, SettingsView as SettingsViewId } from './types'
 
@@ -97,9 +96,16 @@ export function SettingsView({ onClose, onConfigSaved, onMainModelChanged }: Set
       setActiveView('gateway')
     }
   }, [activeView, setActiveView])
-  // Providers subnav (Accounts vs API keys) lives in its own param so each
-  // sub-view is deep-linkable and survives a refresh.
-  const [providerView, setProviderView] = useRouteEnumParam<ProviderView>('pview', PROVIDER_VIEWS, 'accounts')
+
+  // Providers subnav lives in its own param so the sub-view is deep-linkable
+  // and survives a refresh. A saved link to a removed view (`pview=keys`)
+  // no longer matches the enum and falls back to custom endpoints.
+  const [providerView, setProviderView] = useRouteEnumParam<ProviderView>(
+    'pview',
+    ENABLED_PROVIDER_VIEWS,
+    'custom-endpoints'
+  )
+
   const [keysView] = useRouteEnumParam<KeysView>('kview', KEYS_VIEWS, 'tools')
 
   // Jump to a section + its sub-view in one navigate. Two sequential setters
@@ -123,7 +129,7 @@ export function SettingsView({ onClose, onConfigSaved, onMainModelChanged }: Set
   )
 
   const openProviderView = useCallback(
-    (view: ProviderView) => openSubView('providers', 'pview', view, 'accounts'),
+    (view: ProviderView) => openSubView('providers', 'pview', view, 'custom-endpoints'),
     [openSubView]
   )
 
@@ -197,20 +203,6 @@ export function SettingsView({ onClose, onConfigSaved, onMainModelChanged }: Set
       {
         active: activeView === 'providers',
         children: [
-          {
-            active: activeView === 'providers' && providerView === 'accounts',
-            icon: codiconIcon('account'),
-            id: 'pview:accounts',
-            label: t.settings.nav.providerAccounts,
-            onSelect: () => openProviderView('accounts')
-          },
-          {
-            active: activeView === 'providers' && providerView === 'keys',
-            icon: KeyRound,
-            id: 'pview:keys',
-            label: t.settings.nav.providerApiKeys,
-            onSelect: () => openProviderView('keys')
-          },
           {
             active: activeView === 'providers' && providerView === 'custom-endpoints',
             icon: Globe,

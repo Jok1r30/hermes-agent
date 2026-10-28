@@ -48,6 +48,16 @@ function GroupLabel({ children }: { children: ReactNode }) {
 // Sub-views surfaced as a sidebar subnav: account sign-in vs raw API keys.
 export const PROVIDER_VIEWS = ['accounts', 'keys', 'custom-endpoints'] as const
 
+// Fork: only custom endpoints are reachable. The model runs locally through LM
+// Studio, so cloud sign-in and third-party API keys have nothing to configure
+// here, and both nudge the user toward exactly the traffic this fork avoids.
+//
+// The screens and PROVIDER_VIEWS above stay as they are — this list gates the
+// route parameter only. Keeping the union wide leaves ProvidersSettings and
+// its tests compiling untouched, and re-enabling a view is a one-line edit.
+// A saved `?pview=keys` no longer validates and falls back to custom endpoints.
+export const ENABLED_PROVIDER_VIEWS = ['custom-endpoints'] as const satisfies readonly ProviderView[]
+
 export type ProviderView = (typeof PROVIDER_VIEWS)[number]
 
 // Group the env catalog by provider — one ListRow per vendor plus optional
