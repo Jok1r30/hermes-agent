@@ -161,6 +161,7 @@ export function SettingsView({ onClose, onConfigSaved, onMainModelChanged }: Set
       setActiveView('gateway')
     }
   }, [activeView, setActiveView])
+
   // Providers subnav (Accounts vs API keys) lives in its own param so each
   // sub-view is deep-linkable and survives a refresh.
   // A saved link to a view this fork removed (`?pview=keys`) no longer
@@ -170,6 +171,7 @@ export function SettingsView({ onClose, onConfigSaved, onMainModelChanged }: Set
     ENABLED_PROVIDER_VIEWS,
     'custom-endpoints'
   )
+
   const [keysView] = useRouteEnumParam<KeysView>('kview', KEYS_VIEWS, 'tools')
   const [billingView] = useRouteEnumParam<BillingSubView>('bview', BILLING_VIEWS, 'overview')
   const billingState = useBillingState()
