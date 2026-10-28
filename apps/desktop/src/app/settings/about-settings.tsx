@@ -21,6 +21,10 @@ import {
 import { ListRow, SectionHeading, SettingsContent } from './primitives'
 import { UninstallSection } from './uninstall-section'
 
+// public/ assets are served from BASE_URL — same one-liner brand-mark uses.
+const ASSET_BASE = import.meta.env.BASE_URL
+const assetPath = (path: string) => `${ASSET_BASE}${path.replace(/^\/+/, '')}`
+
 const RELEASE_NOTES_URL = 'https://github.com/NousResearch/hermes-agent/releases'
 const INSTALLER_URL = 'https://hermes-agent.nousresearch.com/'
 
@@ -159,6 +163,13 @@ export function AboutSettings() {
               </p>
             </div>
           </div>
+
+          {/* Updates are off in this fork, and this panel is the surface most
+              people reach for them — the modal overlay is the other one, so
+              both carry the same explanation and image. */}
+          {!supported && (
+            <img alt="" className="mt-3 max-h-56 rounded-md object-contain" src={assetPath('update-disabled.gif')} />
+          )}
 
           <div className="mt-3 flex flex-wrap items-center gap-4">
             <Button

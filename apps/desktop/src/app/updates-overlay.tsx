@@ -200,6 +200,13 @@ function IdleView({
     return (
       <CenteredStatus
         body={status.message ?? u.unsupportedMessage}
+        extra={
+          <img
+            alt=""
+            className="mt-1 max-h-64 w-full rounded-md object-contain"
+            src={assetPath('update-disabled.gif')}
+          />
+        }
         icon={<AlertCircle className="size-6 text-muted-foreground" />}
         title={u.notAvailableTitle}
       />
@@ -554,14 +561,20 @@ function ErrorView({ message, onDismiss, onRetry }: { message: string; onDismiss
   )
 }
 
+// Same one-liner the other asset consumers use (brand-mark, onboarding) —
+// public/ files are served from BASE_URL, so nothing leaves the app.
+const assetPath = (path: string) => `${import.meta.env.BASE_URL}${path.replace(/^\/+/, '')}`
+
 function CenteredStatus({
   action,
   body,
+  extra,
   icon,
   title
 }: {
   action?: React.ReactNode
   body?: string
+  extra?: React.ReactNode
   icon: React.ReactNode
   title: string
 }) {
@@ -572,6 +585,7 @@ function CenteredStatus({
 
         <DialogTitle className="text-center text-lg">{title}</DialogTitle>
         {body && <DialogDescription className="text-center text-sm">{body}</DialogDescription>}
+        {extra}
       </div>
 
       {action && <div className="flex justify-center">{action}</div>}

@@ -14345,48 +14345,12 @@ const UPDATE_DISABLED_MESSAGE =
   'Обновление недоступно. Эта сборка установлена из офлайн-комплекта ' +
   'и обновляется пересборкой архива на сборочной машине — см. README-bundle.md.'
 
-let updateDisabledWindow: BrowserWindow | null = null
-
-/** Show the stub window explaining why updates are off. Focuses the existing
- *  one instead of stacking copies when clicked twice. */
-function showUpdateDisabledWindow() {
-  if (updateDisabledWindow && !updateDisabledWindow.isDestroyed()) {
-    updateDisabledWindow.focus()
-
-    return
-  }
-
-  const win = new BrowserWindow({
-    width: 660,
-    height: 640,
-    resizable: false,
-    minimizable: false,
-    maximizable: false,
-    title: 'Обновление недоступно',
-    icon: getAppIconPath(),
-    // Explicit background: this window must never inherit the translucent
-    // chat surface, whose Mica backing is unreliable on locked-down hosts
-    // and would leave the text sitting on whatever is behind the app.
-    backgroundColor: '#f3f6f8',
-    show: false,
-    webPreferences: { nodeIntegration: false, contextIsolation: true, sandbox: true }
-  })
-
-  // Local file only. The GIF sits next to this HTML inside assets/ (already
-  // covered by the packager's "assets/**"), so the window renders identically
-  // on a machine with no route to the internet.
-  void win.loadFile(path.join(APP_ROOT, 'assets', 'update-disabled.html'))
-  win.once('ready-to-show', () => win.show())
-  win.on('closed', () => {
-    updateDisabledWindow = null
-  })
-
-  updateDisabledWindow = win
-}
-
-// `supported: false` is an existing contract the renderer already handles
-// (updates-overlay.tsx and about-settings.tsx render `message` under a
-// "not available" heading), so no update button is offered in the first place.
+// `supported: false` is an existing contract the renderer already handles:
+// updates-overlay.tsx renders `message` under a "not available" heading — and
+// now the GIF with it — while about-settings.tsx shows the same message. No
+// update button is offered, which is why the stub lives in that view rather
+// than behind an Apply the user can never reach (an earlier attempt opened its
+// own window from `apply`, and nothing ever called it).
 ipcMain.handle('hermes:updates:check', async () => ({
   supported: false,
   reason: 'fork-update-disabled',
@@ -14395,11 +14359,12 @@ ipcMain.handle('hermes:updates:check', async () => ({
   branch: readDesktopUpdateConfig().branch
 }))
 
-ipcMain.handle('hermes:updates:apply', async () => {
-  showUpdateDisabledWindow()
-
-  return { ok: false, error: 'fork-update-disabled', message: UPDATE_DISABLED_MESSAGE }
-})
+// Kept as a refusal for any direct caller, though no UI path reaches it.
+ipcMain.handle('hermes:updates:apply', async () => ({
+  ok: false,
+  error: 'fork-update-disabled',
+  message: UPDATE_DISABLED_MESSAGE
+}))
 
 ipcMain.handle('hermes:updates:branch:get', async () => readDesktopUpdateConfig())
 
