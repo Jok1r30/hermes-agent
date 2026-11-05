@@ -25,8 +25,9 @@ REM  manifests - which are resolved from the checkout layout.
 REM  Shipping the tree costs ~60 MB against a ~310 MB bundle and
 REM  keeps every asset resolving the way upstream expects.
 REM
-REM  Put this file in the Hermes source root (next to
-REM  pyproject.toml) and run it.
+REM  Lives in offline-bundle\ of a Hermes checkout, next to
+REM  install.bat; the checkout root is its parent folder. Run it
+REM  from anywhere: offline-bundle\build-bundle.bat.
 REM
 REM  Optional overrides:
 REM    set ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/
@@ -34,25 +35,26 @@ REM    set HTTPS_PROXY=http://proxy.corp:3128
 REM    set BUNDLE_OUT=D:\somewhere\hermes-bundle.zip
 REM ===========================================================
 
-set "SRC=%~dp0"
-if "%SRC:~-1%"=="\" set "SRC=%SRC:~0,-1%"
+set "HERE=%~dp0"
+if "%HERE:~-1%"=="\" set "HERE=%HERE:~0,-1%"
+for %%I in ("%HERE%\..") do set "SRC=%%~fI"
 set "NODEROOT=%LOCALAPPDATA%\hermes\node"
 set "NODETMP=%LOCALAPPDATA%\hermes\node-download"
 set "STAGE=%SRC%\.bundle-stage"
 if not defined BUNDLE_OUT set "BUNDLE_OUT=%SRC%\hermes-bundle.zip"
 
 if not exist "%SRC%\pyproject.toml" (
-    echo [ERROR] pyproject.toml not found next to this script.
-    echo         Place this file in the Hermes source root.
+    echo [ERROR] pyproject.toml not found in %SRC%.
+    echo         This script must sit in offline-bundle\ of a Hermes checkout.
     goto :fail
 )
 if not exist "%SRC%\apps\desktop\package.json" (
     echo [ERROR] apps\desktop not present in this checkout.
     goto :fail
 )
-if not exist "%SRC%\install.bat" (
+if not exist "%HERE%\install.bat" (
     echo [ERROR] install.bat not found next to this script.
-    echo         Both scripts must sit in the source root.
+    echo         Both scripts must sit in offline-bundle\.
     goto :fail
 )
 
@@ -62,8 +64,11 @@ echo   output : %BUNDLE_OUT%
 echo.
 
 REM ---------- 1/6  Node.js -----------------------------------
-REM Root package.json engines: node ">=22.22.0". Hermes pins the
-REM 22.x line (hermes_constants.py: _HERMES_NODE_TARGET_MAJOR = 22).
+REM Root package.json engines (upstream 4d5c6cfb0c, 2026-10-23):
+REM node ">=26", npm "<11.10.0 || >=11.17.0". Node 26.0-26.3 ship
+REM npm 11.12-11.16, which that range rejects, so the floor is 26.4
+REM (npm 11.17). An older portable copy fails the check and is
+REM replaced by :install_node.
 echo [!TIME:~0,8!] [1/6] Resolving Node.js ...
 if exist "%NODEROOT%\node.exe" (
     set "PATH=%NODEROOT%;%PATH%"
@@ -71,7 +76,7 @@ if exist "%NODEROOT%\node.exe" (
 )
 set "NODE_OK="
 where node >nul 2>&1 && (
-    node -e "const v=process.versions.node.split('.').map(Number);process.exit((v[0]>22||(v[0]===22&&v[1]>=22))?0:1)" >nul 2>&1 && set "NODE_OK=1"
+    node -e "const v=process.versions.node.split('.').map(Number);process.exit((v[0]>26||(v[0]===26&&v[1]>=4))?0:1)" >nul 2>&1 && set "NODE_OK=1"
 )
 if defined NODE_OK (
     for /f "delims=" %%N in ('node -v') do echo        Node %%N - OK
@@ -99,7 +104,7 @@ if not defined NODE_EXE (
     echo [ERROR] Node answered on PATH but no real node.exe could be
     echo         resolved, so none can be put in the bundle. A shim-only
     echo         install ^(nvm, a .cmd wrapper^) cannot be bundled.
-    echo         Install Node 22.x from nodejs.org, or delete
+    echo         Install Node 26.4+ from nodejs.org, or delete
     echo         %NODEROOT% and re-run to let this script fetch a
     echo         portable copy.
     goto :fail
@@ -169,12 +174,32 @@ if not defined TUI_OK (
 )
 
 REM ---------- 4/6  Electron app ------------------------------
-echo [!TIME:~0,8!] [4/6] npm run pack - downloads Electron 40.x, about 150 MB ...
+echo [!TIME:~0,8!] [4/6] npm run pack - downloads Electron and the Windows packaging tools from GitHub ...
 if defined ELECTRON_MIRROR echo        ELECTRON_MIRROR=%ELECTRON_MIRROR%
+REM The packaging step fetches Electron, 7-Zip, icons, Windows Kits,
+REM the signing dlib, .NET and rcedit with Node's fetch, which gives up
+REM after a 10 s connect timeout (UND_ERR_CONNECT_TIMEOUT, printed only
+REM as "TypeError: fetch failed"). On a flaky link one of them often
+REM fails, and a failed SHASUMS256.txt check even discards the Electron
+REM zip it has just downloaded. fetch-retry.mjs, preloaded through
+REM NODE_OPTIONS for this step only, retries such requests; the builder
+REM step is also re-run, keeping the downloads in .cache\desktop-inputs.
+set "OLD_NODE_OPTIONS=%NODE_OPTIONS%"
+set "PRELOAD=%HERE:\=/%/fetch-retry.mjs"
+set "NODE_OPTIONS=%NODE_OPTIONS% --import "file:///!PRELOAD!""
 pushd "%SRC%\apps\desktop"
 call npm run pack
 set "PACKRC=!errorlevel!"
+for /l %%R in (2,1,3) do (
+    if not "!PACKRC!"=="0" (
+        echo        packaging failed - retry %%R of 3, finished downloads are cached ...
+        call npm run builder -- --dir --publish never
+        set "PACKRC=!errorlevel!"
+    )
+)
 popd
+set "NODE_OPTIONS=%OLD_NODE_OPTIONS%"
+set "OLD_NODE_OPTIONS="
 if not "!PACKRC!"=="0" (
     echo [ERROR] Desktop build failed - see the output above.
     goto :fail
@@ -197,10 +222,13 @@ mkdir "%STAGE%" 2>nul
 REM Trimmed copy of the checkout. Everything excluded here is either
 REM a build input we already consumed (node_modules, apps, ui-tui,
 REM web), or not used at runtime (tests, docs, website, evals).
+REM offline-bundle\ (these scripts) is excluded by full path: the
+REM installer travels at the zip root, not inside src\. So is the
+REM root .cache\ - the desktop packaging download cache, 300+ MB.
 REM hermes_cli\tui_dist and hermes_cli\web_dist ARE inside the copy.
 echo        copying the source tree ...
 robocopy "%SRC%" "%STAGE%\src" /E /NFL /NDL /NJH /NJS /NP ^
-    /XD ".git" "node_modules" "__pycache__" ".idea" ".bundle-stage" "tests" "tests-js" "evals" "website" "docs" "apps" "ui-tui" "web" "mcp-research-data" "contributors" "target" ^
+    /XD "%HERE%" "%SRC%\.cache" ".git" "node_modules" "__pycache__" ".idea" ".bundle-stage" "tests" "tests-js" "evals" "website" "docs" "apps" "ui-tui" "web" "mcp-research-data" "contributors" "target" ^
     /XF "*.pyc" "hermes-bundle.zip" >nul
 if errorlevel 8 (
     echo [ERROR] robocopy failed while staging the source.
@@ -222,7 +250,7 @@ if errorlevel 1 (
     goto :fail
 )
 
-copy /y "%SRC%\install.bat" "%STAGE%\install.bat" >nul
+copy /y "%HERE%\install.bat" "%STAGE%\install.bat" >nul
 
 REM ---------- 6/6  pack -------------------------------------
 echo [!TIME:~0,8!] [6/6] Packing ...
@@ -286,7 +314,7 @@ REM corporate proxy.
 echo        Node.js missing or too old - installing a portable copy ...
 set "NARCH=x64"
 if /i "%PROCESSOR_ARCHITECTURE%"=="ARM64" set "NARCH=arm64"
-set "NIDX=https://nodejs.org/dist/latest-v22.x/"
+set "NIDX=https://nodejs.org/dist/latest-v26.x/"
 
 if not exist "%NODETMP%" mkdir "%NODETMP%" 2>nul
 set "IDXFILE=%NODETMP%\index.html"
@@ -320,7 +348,7 @@ if errorlevel 1 (
 )
 
 set "NODESRC="
-for /d %%D in ("%NODETMP%\node-v22*-win-!NARCH!") do set "NODESRC=%%~fD"
+for /d %%D in ("%NODETMP%\node-v26*-win-!NARCH!") do set "NODESRC=%%~fD"
 if not defined NODESRC (
     echo        extracted tree not found
     goto :eof

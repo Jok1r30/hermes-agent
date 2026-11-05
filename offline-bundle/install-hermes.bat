@@ -15,8 +15,9 @@ REM  fast machine) sits next to this file, the prebuilt desktop app
 REM  is unpacked from it and npm / Electron / Node are skipped
 REM  entirely. Otherwise the app is built here, which is slow.
 REM
-REM  Put this file in the Hermes source root (next to
-REM  pyproject.toml) and run it.
+REM  Lives in offline-bundle\ of a Hermes checkout; the checkout
+REM  root is its parent folder. The desktop zip may sit either
+REM  next to this file or in the checkout root.
 REM
 REM  Optional overrides, set before running:
 REM    set HERMES_HOME=D:\somewhere\hermes-data
@@ -25,12 +26,13 @@ REM    set PIP_INDEX_URL=https://nexus.corp/repository/pypi/simple
 REM    set SKIP_DESKTOP=1        CLI only
 REM ===========================================================
 
-set "SRC=%~dp0"
-if "%SRC:~-1%"=="\" set "SRC=%SRC:~0,-1%"
+set "HERE=%~dp0"
+if "%HERE:~-1%"=="\" set "HERE=%HERE:~0,-1%"
+for %%I in ("%HERE%\..") do set "SRC=%%~fI"
 
 if not exist "%SRC%\pyproject.toml" (
-    echo [ERROR] pyproject.toml not found next to this script.
-    echo         Place this file in the Hermes source root.
+    echo [ERROR] pyproject.toml not found in %SRC%.
+    echo         This script must sit in offline-bundle\ of a Hermes checkout.
     goto :fail
 )
 
@@ -46,7 +48,8 @@ if not exist "%HERMES_HOME%" mkdir "%HERMES_HOME%" 2>nul
 set "PIPLOG=%HERMES_HOME%\install-pip.log"
 set "NODEROOT=%HERMES_HOME%\node"
 set "NODETMP=%HERMES_HOME%\node-download"
-set "BUNDLE=%SRC%\hermes-desktop-bundle.zip"
+set "BUNDLE=%HERE%\hermes-desktop-bundle.zip"
+if not exist "%BUNDLE%" set "BUNDLE=%SRC%\hermes-desktop-bundle.zip"
 set "DESKTOP_BUILT="
 set "LAUNCHER="
 set "LMMODEL="
@@ -246,7 +249,7 @@ if exist "%NODEROOT%\node.exe" (
 )
 set "NODE_OK="
 where node >nul 2>&1 && (
-    node -e "const v=process.versions.node.split('.').map(Number);process.exit((v[0]>22||(v[0]===22&&v[1]>=22))?0:1)" >nul 2>&1 && set "NODE_OK=1"
+    node -e "const v=process.versions.node.split('.').map(Number);process.exit((v[0]>26||(v[0]===26&&v[1]>=4))?0:1)" >nul 2>&1 && set "NODE_OK=1"
 )
 if defined NODE_OK (
     for /f "delims=" %%N in ('node -v') do echo        Node %%N - OK
@@ -380,7 +383,7 @@ REM corporate proxy.
 echo        Node.js missing or too old - installing a portable copy ...
 set "NARCH=x64"
 if /i "%PROCESSOR_ARCHITECTURE%"=="ARM64" set "NARCH=arm64"
-set "NIDX=https://nodejs.org/dist/latest-v22.x/"
+set "NIDX=https://nodejs.org/dist/latest-v26.x/"
 
 if not exist "%NODETMP%" mkdir "%NODETMP%" 2>nul
 set "IDXFILE=%NODETMP%\index.html"
@@ -414,7 +417,7 @@ if errorlevel 1 (
 )
 
 set "NODESRC="
-for /d %%D in ("%NODETMP%\node-v22*-win-!NARCH!") do set "NODESRC=%%~fD"
+for /d %%D in ("%NODETMP%\node-v26*-win-!NARCH!") do set "NODESRC=%%~fD"
 if not defined NODESRC (
     echo        extracted tree not found
     goto :eof

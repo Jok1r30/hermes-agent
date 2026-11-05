@@ -13,9 +13,9 @@ REM  Deliberately avoids install.ps1 and Hermes-Setup.exe: on hosts
 REM  where EDR/AppLocker blocks PowerShell scripts those fail with
 REM  ACCESS_DENIED before anything runs.
 REM
-REM  Also works when placed directly in a source checkout (next to
-REM  pyproject.toml); it then installs that tree in place and skips
-REM  the desktop app.
+REM  Also works from a source checkout, where it lives in
+REM  offline-bundle\ (the checkout root is its parent folder); it
+REM  then installs that tree in place and skips the desktop app.
 REM
 REM  Optional overrides, set before running:
 REM    set HERMES_HOME=D:\somewhere\hermes-data
@@ -30,12 +30,14 @@ if not defined HERMES_HOME set "HERMES_HOME=%LOCALAPPDATA%\hermes"
 
 REM Bundle layout or bare checkout?
 set "MODE="
+for %%I in ("%HERE%\..") do set "PARENT=%%~fI"
 if exist "%HERE%\src\pyproject.toml" set "MODE=bundle"
-if not defined MODE if exist "%HERE%\pyproject.toml" set "MODE=checkout"
+if not defined MODE if exist "%PARENT%\pyproject.toml" set "MODE=checkout"
 if not defined MODE (
-    echo [ERROR] Neither src\pyproject.toml nor pyproject.toml found here.
-    echo         Run this from an unpacked hermes-bundle, or from a
-    echo         Hermes source root.
+    echo [ERROR] Neither src\pyproject.toml here nor pyproject.toml
+    echo         in the parent folder was found. Run this from an
+    echo         unpacked hermes-bundle, or from offline-bundle\ of a
+    echo         Hermes checkout.
     goto :fail
 )
 
@@ -47,7 +49,7 @@ REM reaches for its own PowerShell bootstrap.
 if "%MODE%"=="bundle" (
     set "ROOT=%HERMES_HOME%\hermes-agent"
 ) else (
-    set "ROOT=%HERE%"
+    set "ROOT=%PARENT%"
 )
 set "VENV=!ROOT!\venv"
 set "APPDIR=%HERMES_HOME%\desktop"

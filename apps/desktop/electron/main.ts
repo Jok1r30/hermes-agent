@@ -17131,7 +17131,7 @@ const disposeTerminalSession = terminalIpc.disposeTerminalSession
 // process is Node and cannot read that module.
 const UPDATE_DISABLED_MESSAGE =
   'Обновление недоступно. Эта сборка установлена из офлайн-комплекта ' +
-  'и обновляется пересборкой архива на сборочной машине — см. README-bundle.md.'
+  'и обновляется пересборкой архива на сборочной машине — см. offline-bundle/README.md.'
 
 // `supported: false` is an existing contract the renderer already handles: it
 // is the `unsupported` tone of UpdateStatusCard, which both the About page and

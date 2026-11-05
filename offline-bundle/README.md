@@ -1,6 +1,6 @@
 # Hermes в изоляции от сети
 
-Форк [Hermes Agent](README.md), в котором агент не ходит в интернет. Модель
+Форк [Hermes Agent](https://github.com/NousResearch/hermes-agent), в котором агент не ходит в интернет. Модель
 работает локально через LM Studio, а фоновые обращения наружу выключены в
 конфиге: загрузка бинарника tirith с GitHub Releases (`security.tirith_enabled`),
 доустановка пакетов с PyPI на лету (`security.allow_lazy_installs`), каталог
@@ -10,17 +10,19 @@ models.dev (`models_dev.url` уводится в недостижимый адр
 проекте нет.
 
 Отсюда и способ установки: комплект собирается один раз на машине с сетью и
-переносится одним архивом, так что на целевой машине ничего не скачивается.
+переносится одним архивом. На целевой машине скачиваются только пакеты
+Python: нужен доступ к pypi.org или `set PIP_INDEX_URL=<зеркало>`.
 
 1. **Собрать** — на машине с доступом к npm и nodejs.org:
 
    ```
    git clone https://github.com/Jok1r30/hermes-agent.git
    cd hermes-agent
-   build-bundle.bat
+   offline-bundleuild-bundle.bat
    ```
 
-   20–40 минут. На выходе `hermes-bundle.zip` (~210 МБ) рядом со скриптом.
+   20–40 минут. На выходе `hermes-bundle.zip` (~210 МБ) в корне репозитория
+   (другое место — `set BUNDLE_OUT=D:\путь\hermes-bundle.zip`).
 
 2. **Распаковать** — куда угодно на целевой машине, установщик сам перенесёт
    файлы куда нужно:
@@ -53,7 +55,7 @@ models.dev (`models_dev.url` уводится в недостижимый адр
    с тем же текстом. Штатное обновление — это `git pull` в чекауте, а комплект
    едет без `.git`, так что сработать оно не может, зато способно испортить
    дерево исходников. Обновляться нужно пересборкой: `git pull` и
-   `build-bundle.bat` на сборочной машине, затем пункты 2 и 3 заново.
+   `offline-bundleuild-bundle.bat` на сборочной машине, затем пункты 2 и 3 заново. Как
+   выпустить новый комплект — [RELEASE.md](RELEASE.md).
 
-Подробности — сетевая изоляция построчно, известные дефекты, разбор сборки —
-в [runbook'е](https://claude.ai/code/artifact/ed8b9cc7-dae8-4fdd-b67d-995d2c907c51).
+Что обязан содержать комплект — [openspec/specs/offline-bundle/spec.md](../openspec/specs/offline-bundle/spec.md).
