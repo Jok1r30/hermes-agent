@@ -106,18 +106,36 @@ for /f "delims=" %%P in ('!PY_CMD! -c "import sys;print(sys.version.split()[0])"
 echo        Python !PY_VER! via "!PY_CMD!"
 
 REM ---------- 2/7  place the files ---------------------------
+REM robocopy defaults to /R:1000000 /W:30: one locked file (a running
+REM Hermes.exe, or EDR holding a freshly written .exe) makes it retry
+REM silently for days. /R:2 /W:2 bounds that to seconds, and the log
+REM names the file that failed instead of hiding it behind >nul.
+set "COPYLOG=%HERMES_HOME%\install-copy.log"
+set "ROBO=/E /R:2 /W:2 /MT:8 /NDL /NJH /NP /LOG:"%COPYLOG%""
 if "%MODE%"=="bundle" (
     echo [!TIME:~0,8!] [2/7] Installing files into !ROOT! ...
-    robocopy "%HERE%\src" "!ROOT!" /E /NFL /NDL /NJH /NJS /NP /XD "venv" >nul
+    robocopy "%HERE%\src" "!ROOT!" !ROBO! /XD "venv" >nul
     if errorlevel 8 (
-        echo [ERROR] Could not copy the source tree.
+        echo [ERROR] Could not copy the source tree. Failed files:
+        findstr /i /c:"ERROR " "%COPYLOG%"
+        echo         full log: %COPYLOG%
         goto :fail
     )
     if exist "%HERE%\desktop\Hermes.exe" (
-        echo        installing the desktop app into %APPDIR% ...
-        robocopy "%HERE%\desktop" "%APPDIR%" /E /NFL /NDL /NJH /NJS /NP >nul
-        if errorlevel 8 (
-            echo [WARN] Could not copy the desktop app - CLI will still work.
+        call :desktop_running
+        echo        installing the desktop app into %APPDIR% - about 430 MB, a few minutes ...
+        robocopy "%HERE%\desktop" "%APPDIR%" !ROBO! >nul
+        REM Ctrl+C kills robocopy with 0xC000013A - a NEGATIVE errorlevel,
+        REM which "if errorlevel 8" reads as success. A half-copied app
+        REM must not get a shortcut, so test the range explicitly.
+        set "RC=!ERRORLEVEL!"
+        set "COPY_BAD="
+        if !RC! GEQ 8 set "COPY_BAD=1"
+        if !RC! LSS 0 set "COPY_BAD=1"
+        if defined COPY_BAD (
+            echo [WARN] Desktop app copy failed or was interrupted, code !RC! - CLI will still work. Failed files:
+            findstr /i /c:"ERROR " "%COPYLOG%"
+            echo        full log: %COPYLOG%
         ) else (
             set "DESKTOP_OK=1"
         )
@@ -329,6 +347,18 @@ pause
 exit /b 1
 
 
+:desktop_running
+REM A running desktop app locks Hermes.exe, its DLLs and app.asar, so
+REM overwriting it fails. Ask to close it rather than fail per file.
+tasklist /FI "IMAGENAME eq Hermes.exe" /NH 2>nul | find /i "Hermes.exe" >nul
+if errorlevel 1 goto :eof
+echo.
+echo [WARN] The Hermes desktop app is running and locks its files.
+echo        Close it (including the tray icon), then press any key.
+pause >nul
+goto :desktop_running
+
+
 :place_node
 REM Hermes resolves its own Node before anything on PATH:
 REM iter_hermes_node_dirs() in hermes_constants.py probes
@@ -405,4 +435,13 @@ if defined LMMODEL (
 >> "%CFG%" echo    # models.dev has no off switch - an unroutable URL makes
 >> "%CFG%" echo    # the background refresh fail instantly and serve the cache
 >> "%CFG%" echo    url: "http://127.0.0.1:9/api.json"
+>> "%CFG%" echo.
+>> "%CFG%" echo telemetry:
+>> "%CFG%" echo    # answer the shared-metrics offer with "No thanks" up front:
+>> "%CFG%" echo    # without offer_version the desktop chat strip and the TUI keep asking
+>> "%CFG%" echo    shared_metrics:
+>> "%CFG%" echo       enabled: false
+>> "%CFG%" echo       send: false
+>> "%CFG%" echo       offer_version: 2
+>> "%CFG%" echo       endpoint: "http://127.0.0.1:9/v1/telemetry"
 goto :eof

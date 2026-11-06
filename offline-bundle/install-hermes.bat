@@ -488,4 +488,13 @@ if defined LMMODEL (
 >> "%CFG%" echo    # models.dev has no off switch - an unroutable URL makes
 >> "%CFG%" echo    # the background refresh fail instantly and serve the cache
 >> "%CFG%" echo    url: "http://127.0.0.1:9/api.json"
+>> "%CFG%" echo.
+>> "%CFG%" echo telemetry:
+>> "%CFG%" echo    # answer the shared-metrics offer with "No thanks" up front:
+>> "%CFG%" echo    # without offer_version the desktop chat strip and the TUI keep asking
+>> "%CFG%" echo    shared_metrics:
+>> "%CFG%" echo       enabled: false
+>> "%CFG%" echo       send: false
+>> "%CFG%" echo       offer_version: 2
+>> "%CFG%" echo       endpoint: "http://127.0.0.1:9/v1/telemetry"
 goto :eof
