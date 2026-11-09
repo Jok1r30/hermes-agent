@@ -20,7 +20,7 @@ Python: нужен доступ к pypi.org или `set PIP_INDEX_URL=<зерк�
    ```
    git clone https://github.com/Jok1r30/hermes-agent.git
    cd hermes-agent
-   offline-bundleuild-bundle.bat
+   offline-bundle\build-bundle.bat
    ```
 
    20–40 минут. На выходе `hermes-bundle.zip` (~210 МБ) в корне репозитория
@@ -57,7 +57,7 @@ Python: нужен доступ к pypi.org или `set PIP_INDEX_URL=<зерк�
    с тем же текстом. Штатное обновление — это `git pull` в чекауте, а комплект
    едет без `.git`, так что сработать оно не может, зато способно испортить
    дерево исходников. Обновляться нужно пересборкой: `git pull` и
-   `offline-bundleuild-bundle.bat` на сборочной машине, затем пункты 2 и 3 заново. Как
+   `offline-bundle\build-bundle.bat` на сборочной машине, затем пункты 2 и 3 заново. Как
    выпустить новый комплект — [RELEASE.md](RELEASE.md).
 
 Что обязан содержать комплект — [openspec/specs/offline-bundle/spec.md](../openspec/specs/offline-bundle/spec.md).

@@ -6,7 +6,7 @@
 комплекта лежат в папке `offline-bundle/`, команды ниже запускаются из корня репозитория.
 
 Коротко: синхронизировать форк с апстримом (если нужно) → проверить правки форка → собрать
-`offline-bundleuild-bundle.bat` → проверить архив и установку → выпустить. Обновить комплект на месте нельзя:
+`offline-bundle\build-bundle.bat` → проверить архив и установку → выпустить. Обновить комплект на месте нельзя:
 каждое обновление — это новый архив, который ставят поверх (пункты 2–3 [README.md](README.md)).
 
 ## 0. Что в форке своего
@@ -96,7 +96,7 @@ class-level skip с причиной, а тело теста не трогают
 git switch main
 git pull
 set BUNDLE_OUT=D:\hermes-releases\hermes-bundle-YYYY-MM-DD-<sha>.zip
-offline-bundleuild-bundle.bat
+offline-bundle\build-bundle.bat
 ```
 
 `<sha>` — `git rev-parse --short HEAD`. Сборка идёт 20–40 минут. В конце должно быть
