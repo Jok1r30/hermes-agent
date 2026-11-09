@@ -238,9 +238,13 @@ async def arm_detached_orphan_close(authority, session_id):
 
 def _idle_s(authority, session_id):
     from hermes_state_common import _sql_session_last_active
+    # Resolved before the read: it takes a read context of its own, and without WAL (a
+    # WAL-reset-vulnerable SQLite) every read context holds the writer's non-reentrant lock,
+    # so a nested one deadlocks the event loop at boot until the watchdog kills the gateway.
+    target = _physical_target(authority, session_id)
     with authority.db._read_ctx() as conn:
         row = conn.execute(f'SELECT {_sql_session_last_active("s")} FROM sessions s WHERE s.id = ?',
-                           (_physical_target(authority, session_id),)).fetchone()
+                           (target,)).fetchone()
     return time.time() - row[0] if row and row[0] else 0.0
 
 
